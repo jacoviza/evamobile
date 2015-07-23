@@ -75,11 +75,13 @@ angular.module('mm.addons.calendar')
                 // Schedule notifications for the events retrieved (might have new events).
                 $mmaCalendar.scheduleEventsNotifications(events);
             }
-        }, function(err) {
-            if (err) {
-                $log.error(err);
+        }, function(error) {
+            if (error) {
+                $mmUtil.showErrorModal(error);
+            } else {
+                $mmUtil.showErrorModal('mma.calendar.errorloadevents', true);
             }
-            $mmUtil.showErrorModal('mma.calendar.errorloadevents', true);
+            $scope.eventsLoaded = true;
         });
     }
 

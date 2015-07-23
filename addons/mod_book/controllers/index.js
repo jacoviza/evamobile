@@ -21,11 +21,12 @@ angular.module('mm.addons.mod_book')
  * @ngdoc controller
  * @name mmaModBookIndexCtrl
  */
-.controller('mmaModBookIndexCtrl', function($scope, $stateParams, $mmUtil, $mmaModBook, $mmSite, $log, mmaModBookComponent,
-                                            $ionicPopover) {
+.controller('mmaModBookIndexCtrl', function($scope, $stateParams, $mmUtil, $mmaModBook, $log, mmaModBookComponent,
+            $ionicPopover, $mmApp, $q, $mmCourse) {
     $log = $log.getInstance('mmaModBookIndexCtrl');
 
-    var module = $stateParams.module || {};
+    var module = $stateParams.module || {},
+        courseid = $stateParams.courseid;
 
     $scope.title = module.name;
     $scope.description = module.description;
@@ -41,14 +42,22 @@ angular.module('mm.addons.mod_book')
 
 
     function fetchContent() {
-        // Show first chapter.
+        var downloadFailed = false;
         return $mmaModBook.downloadAllContent(module).catch(function(err) {
-            // Ignore download errors, they're already treated on $mmaModBookCourseContentHandler.
+            // Mark download as failed but go on since the main files could have been downloaded.
+            downloadFailed = true;
         }).finally(function() {
+            // Show first chapter.
             return $mmaModBook.getChapterContent(module.contents, firstChapter, module.id).then(function(content) {
                 $scope.content = content;
+
+                if (downloadFailed && $mmApp.isOnline()) {
+                    // We could load the main file but the download failed. Show error message.
+                    $mmUtil.showErrorModal('mm.core.errordownloadingsomefiles', true);
+                }
             }).catch(function() {
-                $mmUtil.showErrorModal('mma.mod_book.errorchapter');
+                $mmUtil.showErrorModal('mma.mod_book.errorchapter', true);
+                return $q.reject();
             }).finally(function() {
                 $scope.loaded = true;
             });
@@ -87,10 +96,8 @@ angular.module('mm.addons.mod_book')
 
 
     fetchContent().then(function() {
-        if (module.instance) {
-            $mmSite.write('mod_book_view_book', {
-                urlid: module.instance
-            });
-        }
+        $mmaModBook.logView(module.instance).then(function() {
+            $mmCourse.checkModuleCompletion(courseid, module.completionstatus);
+        });
     });
 });

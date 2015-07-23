@@ -448,32 +448,32 @@ angular.module('mm.core')
             getFromCache(site, method, data, preSets).then(function(data) {
                 deferred.resolve(data);
             }, function() {
-                var mustSaveToCache = preSets.saveToCache;
-                var cacheKey = preSets.cacheKey;
-                var emergencyCache = typeof preSets.emergencyCache !== 'undefined' ? preSets.emergencyCache : true;
-
                 // Do not pass those options to the core WS factory.
-                delete preSets.getFromCache;
-                delete preSets.saveToCache;
-                delete preSets.omitExpires;
-                delete preSets.cacheKey;
-                delete preSets.emergencyCache;
+                var wsPreSets = angular.copy(preSets);
+                delete wsPreSets.getFromCache;
+                delete wsPreSets.saveToCache;
+                delete wsPreSets.omitExpires;
+                delete wsPreSets.cacheKey;
+                delete wsPreSets.emergencyCache;
+                delete wsPreSets.getCacheUsingCacheKey;
 
                 // TODO: Sync
 
-                $mmWS.call(method, data, preSets).then(function(response) {
+                $mmWS.call(method, data, wsPreSets).then(function(response) {
 
-                    if (mustSaveToCache) {
-                        saveToCache(site, method, data, response, cacheKey);
+                    if (preSets.saveToCache) {
+                        saveToCache(site, method, data, response, preSets.cacheKey);
                     }
 
-                    deferred.resolve(response);
+                    // We pass back a clone of the original object, this may
+                    // prevent errors if in the callback the object is modified.
+                    deferred.resolve(angular.copy(response));
                 }, function(error) {
                     if (error === mmCoreSessionExpired) {
                         // Session expired, trigger event.
                         $mmLang.translateErrorAndReject(deferred, 'mm.core.lostconnection');
-                        $mmEvents.trigger(mmCoreEventSessionExpired, {siteid: site.id});
-                    } else if (!emergencyCache) {
+                        $mmEvents.trigger(mmCoreEventSessionExpired, site.id);
+                    } else if (typeof preSets.emergencyCache !== 'undefined' && !preSets.emergencyCache) {
                         $log.debug('WS call ' + method + ' failed. Emergency cache is forbidden, rejecting.');
                         deferred.reject(error);
                     } else {

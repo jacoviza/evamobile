@@ -39,10 +39,14 @@ angular.module('mm.core.settings')
                     }).then(function() {
                         siteData.fullname = site.getInfo().fullname;
                         siteData.sitename = site.getInfo().sitename;
-                        $mmUtil.showModal('mm.settings.success', 'mm.settings.syncsitesuccess');
+                        $mmUtil.showModal('mm.core.success', 'mm.settings.syncsitesuccess');
                     });
-                }).catch(function() {
-                    $mmUtil.showErrorModal('mm.settings.errorsyncsite', true);
+                }).catch(function(error) {
+                    if (error) {
+                        $mmUtil.showErrorModal(error);
+                    } else {
+                        $mmUtil.showErrorModal('mm.settings.errorsyncsite', true);
+                    }
                 }).finally(function() {
                     modal.dismiss();
                 });

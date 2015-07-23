@@ -27,6 +27,31 @@ angular.module('mm.addons.mod_page')
     var self = {};
 
     /**
+     * Download all the content.
+     *
+     * @module mm.addons.mod_page
+     * @ngdoc method
+     * @name $mmaModPage#downloadAllContent
+     * @param {Object} module The module object.
+     * @return {Promise}      Promise resolved when all content is downloaded. Data returned is not reliable.
+     */
+    self.downloadAllContent = function(module) {
+        var promises = [],
+            siteid = $mmSite.getId();
+
+        angular.forEach(module.contents, function(content) {
+            var url = content.fileurl,
+                timemodified = content.timemodified;
+            if (content.type !== 'file') {
+                return;
+            }
+            promises.push($mmFilepool.downloadUrl(siteid, url, false, mmaModPageComponent, module.id, timemodified));
+        });
+
+        return $q.all(promises);
+    };
+
+    /**
      * Get event names of files being downloaded.
      *
      * @module mm.addons.mod_page
@@ -198,6 +223,25 @@ angular.module('mm.addons.mod_page')
             encodedUrl = encodeURIComponent(url);
 
         return (filename === 'index.html' && (fileurl.indexOf(url) > 0 || fileurl.indexOf(encodedUrl) > 0 ));
+    };
+
+    /**
+     * Report a page as being viewed.
+     *
+     * @module mm.addons.mod_page
+     * @ngdoc method
+     * @name $mmaModPage#logView
+     * @param {String} id Module ID.
+     * @return {Promise}  Promise resolved when the WS call is successful.
+     */
+    self.logView = function(id) {
+        if (id) {
+            var params = {
+                urlid: id
+            };
+            return $mmSite.write('mod_page_view_page', params);
+        }
+        return $q.reject();
     };
 
     /**

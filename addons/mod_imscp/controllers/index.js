@@ -22,10 +22,11 @@ angular.module('mm.addons.mod_imscp')
  * @name mmaModImscpIndexCtrl
  */
 .controller('mmaModImscpIndexCtrl', function($scope, $stateParams, $mmUtil, $mmaModImscp, $log, mmaModImscpComponent,
-                                                $ionicPopover, $mmFS) {
+            $ionicPopover, $mmFS, $q, $mmCourse, $mmApp) {
     $log = $log.getInstance('mmaModImscpIndexCtrl');
 
-    var module = $stateParams.module || {};
+    var module = $stateParams.module || {},
+        courseid = $stateParams.courseid;
 
     $scope.title = module.name;
     $scope.description = module.description;
@@ -40,22 +41,33 @@ angular.module('mm.addons.mod_imscp')
 
     function fetchContent() {
         if (module.contents) {
-            $mmaModImscp.getIframeSrc(module).then(function(src) {
-                $scope.src = src;
-                $mmaModImscp.logView(module.instance);
-            }).catch(function() {
-                $mmUtil.showErrorModal('mma.mod_imscp.deploymenterror', true);
+            var downloadFailed = false;
+            return $mmaModImscp.downloadAllContent(module).catch(function(err) {
+                // Mark download as failed but go on since the main files could have been downloaded.
+                downloadFailed = true;
             }).finally(function() {
-                $scope.loaded = true;
+                return $mmaModImscp.getIframeSrc(module).then(function(src) {
+                    $scope.src = src;
+
+                    if (downloadFailed && $mmApp.isOnline()) {
+                        // We could load the main file but the download failed. Show error message.
+                        $mmUtil.showErrorModal('mm.core.errordownloadingsomefiles', true);
+                    }
+                }).catch(function() {
+                    $mmUtil.showErrorModal('mma.mod_imscp.deploymenterror', true);
+                    return $q.reject();
+                }).finally(function() {
+                    $scope.loaded = true;
+                });
             });
         } else {
             $mmUtil.showErrorModal('mma.mod_imscp.deploymenterror', true);
+            return $q.reject();
         }
     }
 
     $scope.doRefresh = function() {
-        $mmaModImscp.invalidateContent(module.id)
-        .then(function() {
+        $mmaModImscp.invalidateContent(module.id).then(function() {
             return fetchContent();
         }).finally(function() {
             $scope.loaded = true;
@@ -64,7 +76,7 @@ angular.module('mm.addons.mod_imscp')
 
     $scope.loadItem = function(itemId) {
         $scope.popover.hide();
-        $scope.src = $mmaModImscp.getFileSrc(module.url, itemId);
+        $scope.src = $mmaModImscp.getFileSrc(module, itemId);
         $scope.previousItem = $mmaModImscp.getPreviousItem($scope.items, itemId);
         $scope.nextItem = $mmaModImscp.getNextItem($scope.items, itemId);
     };
@@ -79,5 +91,9 @@ angular.module('mm.addons.mod_imscp')
         $scope.popover = popover;
     });
 
-    fetchContent();
+    fetchContent().then(function() {
+        $mmaModImscp.logView(module.instance).then(function() {
+            $mmCourse.checkModuleCompletion(courseid, module.completionstatus);
+        });
+    });
 });

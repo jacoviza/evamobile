@@ -14,6 +14,8 @@
 
 angular.module('mm.core')
 
+.constant('mmCoreEventKeyboardShow', 'keyboard_show')
+.constant('mmCoreEventKeyboardHide', 'keyboard_hide')
 .constant('mmCoreEventSessionExpired', 'session_expired')
 .constant('mmCoreEventLogin', 'login')
 .constant('mmCoreEventLogout', 'logout')
@@ -21,6 +23,7 @@ angular.module('mm.core')
 .constant('mmCoreEventSiteAdded', 'site_added')
 .constant('mmCoreEventSiteUpdated', 'site_updated')
 .constant('mmCoreEventQueueEmpty', 'filepool_queue_empty')
+.constant('mmCoreEventCompletionModuleViewed', 'completion_module_viewed')
 
 /**
  * Service to send and listen to events.
