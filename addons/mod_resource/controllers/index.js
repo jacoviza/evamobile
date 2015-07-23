@@ -21,10 +21,12 @@ angular.module('mm.addons.mod_resource')
  * @ngdoc controller
  * @name mmaModResourceIndexCtrl
  */
-.controller('mmaModResourceIndexCtrl', function($scope, $stateParams, $mmUtil, $mmaModResource, $log, mmaModResourceComponent) {
+.controller('mmaModResourceIndexCtrl', function($scope, $stateParams, $mmUtil, $mmaModResource, $log, $mmApp, $mmCourse,
+            mmaModResourceComponent) {
     $log = $log.getInstance('mmaModResourceIndexCtrl');
 
-    var module = $stateParams.module || {};
+    var module = $stateParams.module || {},
+        courseid = $stateParams.courseid;
 
     $scope.title = module.name;
     $scope.description = module.description;
@@ -38,21 +40,43 @@ angular.module('mm.addons.mod_resource')
         if (module.contents) {
             if ($mmaModResource.isDisplayedInIframe(module)) {
                 $scope.mode = 'iframe';
-                $mmaModResource.getIframeSrc(module).then(function(src) {
-                    $scope.src = src;
-                    $mmaModResource.logView(module.instance);
-                }).catch(function() {
-                    $mmUtil.showErrorModal('mma.mod_resource.errorwhileloadingthecontent', true);
+                var downloadFailed = false;
+                return $mmaModResource.downloadAllContent(module).catch(function(err) {
+                    // Mark download as failed but go on since the main files could have been downloaded.
+                    downloadFailed = true;
                 }).finally(function() {
-                    $scope.loaded = true;
+                    $mmaModResource.getIframeSrc(module).then(function(src) {
+                        $scope.src = src;
+                        $mmaModResource.logView(module.instance).then(function() {
+                            $mmCourse.checkModuleCompletion(courseid, module.completionstatus);
+                        });
+                        if (downloadFailed && $mmApp.isOnline()) {
+                            // We could load the main file but the download failed. Show error message.
+                            $mmUtil.showErrorModal('mm.core.errordownloadingsomefiles', true);
+                        }
+                    }).catch(function() {
+                        $mmUtil.showErrorModal('mma.mod_resource.errorwhileloadingthecontent', true);
+                    }).finally(function() {
+                        $scope.loaded = true;
+                    });
                 });
             } else if ($mmaModResource.isDisplayedInline(module)) {
-                // Ignore errors, they're already treated on $mmaModResourceCourseContentHandler.
-                $mmaModResource.downloadAllContent(module).finally(function() {
+                var downloadFailed = false;
+                $mmaModResource.downloadAllContent(module).catch(function(err) {
+                    // Mark download as failed but go on since the main files could have been downloaded.
+                    downloadFailed = true;
+                }).finally(function() {
                     $mmaModResource.getResourceHtml(module.contents, module.id).then(function(content) {
                         $scope.mode = 'inline';
                         $scope.content = content;
-                        $mmaModResource.logView(module.instance);
+                        $mmaModResource.logView(module.instance).then(function() {
+                            $mmCourse.checkModuleCompletion(courseid, module.completionstatus);
+                        });
+
+                        if (downloadFailed && $mmApp.isOnline()) {
+                            // We could load the main file but the download failed. Show error message.
+                            $mmUtil.showErrorModal('mm.core.errordownloadingsomefiles', true);
+                        }
                     }).catch(function() {
                         $mmUtil.showErrorModal('mma.mod_resource.errorwhileloadingthecontent', true);
                     }).finally(function() {
@@ -67,7 +91,9 @@ angular.module('mm.addons.mod_resource')
                     var modal = $mmUtil.showModalLoading('mm.core.downloading', true);
 
                     $mmaModResource.openFile(module.contents, module.id).then(function() {
-                        $mmaModResource.logView(module.instance);
+                        $mmaModResource.logView(module.instance).then(function() {
+                            $mmCourse.checkModuleCompletion(courseid, module.completionstatus);
+                        });
                     }).catch(function() {
                         modal.dismiss();
                         $mmUtil.showErrorModal('mma.mod_resource.errorwhileloadingthecontent', true);
